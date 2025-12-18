@@ -1,0 +1,49 @@
+{
+  "name": "tinypdf",
+  "version": "0.1.0",
+  "description": "Minimal PDF creation library. <400 LOC, zero dependencies, makes real PDFs.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir ./dist --target node && bun run build:cjs && bun run build:types",
+    "build:cjs": "bun build ./src/index.ts --outfile ./dist/index.cjs --target node --format cjs",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-generator",
+    "pdf-creation",
+    "document",
+    "minimal",
+    "zero-dependencies"
+  ],
+  "author": "Lulzx",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lulzx/tinypdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Lulzx/tinypdf/issues"
+  },
+  "homepage": "https://github.com/Lulzx/tinypdf#readme",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
