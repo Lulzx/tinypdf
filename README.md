@@ -2,6 +2,19 @@
 
 Minimal PDF creation library. <400 LOC, zero dependencies, makes real PDFs.
 
+## Why tinypdf?
+
+**~70x smaller than jsPDF.**
+
+| Library | Bundle Size (min+gzip) | Dependencies |
+|---------|------------------------|--------------|
+| jsPDF | 229 KB | 2 |
+| **tinypdf** | **3.3 KB** | **0** |
+
+jsPDF includes TTF font embedding, PNG/GIF/BMP support, HTML-to-PDF, SVG rendering, forms, encryption, compression, and a plugin system. We deleted all of that.
+
+What's left is the 95% use case: **put text and images on a page.**
+
 ## Installation
 
 ```bash
