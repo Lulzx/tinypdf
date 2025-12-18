@@ -15,6 +15,37 @@ jsPDF includes TTF font embedding, PNG/GIF/BMP support, HTML-to-PDF, SVG renderi
 
 What's left is the 95% use case: **put text and images on a page.**
 
+### What you can build
+
+- Invoices and receipts
+- Reports and statements
+- Shipping labels
+- Tickets and boarding passes
+- Certificates
+- Simple contracts
+- Data exports with formatting
+
+### What's included
+
+- **Text** — Helvetica font, any size, hex colors, left/center/right alignment
+- **Rectangles** — filled boxes for headers, backgrounds, table cells
+- **Lines** — dividers, borders, table grids
+- **JPEG images** — photos, logos, signatures
+- **Multi-page** — add as many pages as needed
+- **Custom page sizes** — letter, A4, or any dimensions
+
+### What's NOT included
+
+- Custom fonts (TTF/OTF embedding)
+- PNG/GIF/SVG images
+- Vector graphics
+- Forms and annotations
+- Encryption
+- Compression
+- HTML-to-PDF
+
+If you need those, use [jsPDF](https://github.com/parallax/jsPDF) or [pdf-lib](https://github.com/Hopding/pdf-lib).
+
 ## Installation
 
 ```bash
