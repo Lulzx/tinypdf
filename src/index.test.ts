@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { pdf, measureText } from './index'
+import { pdf, measureText, markdown } from './index'
 
 describe('pdf', () => {
   test('creates a valid PDF with header', () => {
@@ -485,5 +485,127 @@ describe('color parsing', () => {
     const bytes = doc.build()
     const str = new TextDecoder().decode(bytes)
     expect(str).toContain('1.000 0.000 0.000 rg')
+  })
+})
+
+describe('markdown', () => {
+  test('creates valid PDF', () => {
+    const bytes = markdown('# Hello')
+    const str = new TextDecoder().decode(bytes.slice(0, 8))
+    expect(str).toBe('%PDF-1.4')
+  })
+
+  test('returns Uint8Array', () => {
+    const bytes = markdown('Hello')
+    expect(bytes).toBeInstanceOf(Uint8Array)
+  })
+
+  test('renders h1 header', () => {
+    const bytes = markdown('# Title')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Title) Tj')
+    expect(str).toContain('/F1 22 Tf')
+  })
+
+  test('renders h2 header', () => {
+    const bytes = markdown('## Subtitle')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Subtitle) Tj')
+    expect(str).toContain('/F1 16 Tf')
+  })
+
+  test('renders h3 header', () => {
+    const bytes = markdown('### Section')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Section) Tj')
+    expect(str).toContain('/F1 13 Tf')
+  })
+
+  test('renders bullet list with dash', () => {
+    const bytes = markdown('- Item one')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('Item one')
+  })
+
+  test('renders bullet list with asterisk', () => {
+    const bytes = markdown('* Item two')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('Item two')
+  })
+
+  test('renders numbered list', () => {
+    const bytes = markdown('1. First item')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('1.')
+    expect(str).toContain('First item')
+  })
+
+  test('renders horizontal rule', () => {
+    const bytes = markdown('---')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('l')
+    expect(str).toContain('S')
+  })
+
+  test('renders paragraph text', () => {
+    const bytes = markdown('This is a paragraph.')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(This is a paragraph.) Tj')
+  })
+
+  test('uses default page size', () => {
+    const bytes = markdown('Hello')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('/MediaBox [0 0 612 792]')
+  })
+
+  test('accepts custom page size', () => {
+    const bytes = markdown('Hello', { width: 400, height: 600 })
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('/MediaBox [0 0 400 600]')
+  })
+
+  test('creates multiple pages for long content', () => {
+    const lines = Array(100).fill('This is a line of text.').join('\n')
+    const bytes = markdown(lines)
+    const str = new TextDecoder().decode(bytes)
+    const pageCount = (str.match(/\/Type \/Page\b/g) || []).length
+    expect(pageCount).toBeGreaterThan(1)
+  })
+
+  test('wraps long lines', () => {
+    const longLine = 'word '.repeat(50)
+    const bytes = markdown(longLine)
+    const str = new TextDecoder().decode(bytes)
+    const tjCount = (str.match(/\) Tj/g) || []).length
+    expect(tjCount).toBeGreaterThan(1)
+  })
+
+  test('handles empty input', () => {
+    const bytes = markdown('')
+    expect(bytes).toBeInstanceOf(Uint8Array)
+    expect(bytes.length).toBeGreaterThan(0)
+  })
+
+  test('handles mixed content', () => {
+    const md = `# Header
+
+Some paragraph text.
+
+- Bullet one
+- Bullet two
+
+1. Number one
+2. Number two
+
+---
+
+More text.`
+    const bytes = markdown(md)
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('Header')
+    expect(str).toContain('paragraph')
+    expect(str).toContain('Bullet')
+    expect(str).toContain('Number')
   })
 })

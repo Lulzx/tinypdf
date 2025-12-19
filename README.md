@@ -37,6 +37,7 @@ Invoices, receipts, reports, shipping labels, tickets, certificates, contracts, 
 | **Shapes** | Rectangles and lines |
 | **Images** | JPEG (photos, logos, signatures) |
 | **Pages** | Multiple pages, custom sizes |
+| **Markdown** | Convert markdown to PDF with headers, lists, rules |
 
 ### Not included
 
@@ -82,6 +83,31 @@ import { measureText } from 'tinypdf'
 measureText('Hello', 12) // => 27.34 (points)
 ```
 
+### Markdown to PDF
+
+```typescript
+import { markdown } from 'tinypdf'
+import { writeFileSync } from 'fs'
+
+const pdf = markdown(`
+# Hello World
+
+A minimal PDF from markdown.
+
+## Features
+- Headers (h1, h2, h3)
+- Bullet lists
+- Numbered lists
+- Horizontal rules
+
+---
+
+Automatic word wrapping and pagination included.
+`)
+
+writeFileSync('output.pdf', pdf)
+```
+
 ---
 
 ## API
@@ -98,6 +124,7 @@ ctx.line(x1, y1, x2, y2, stroke, width?)   // line
 ctx.image(jpegBytes, x, y, w, h)           // JPEG image
 
 measureText(str, size)                     // text width in points
+markdown(str, options?)                    // options: { width, height, margin }
 ```
 
 ---

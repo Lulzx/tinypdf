@@ -320,4 +320,81 @@ export function pdf(): PDFBuilder {
   return { page, build, measureText }
 }
 
+/**
+ * Convert markdown to PDF
+ * Supports: # headers, - lists, 1. numbered lists, --- rules, paragraphs with word wrap
+ */
+export function markdown(md: string, opts: { width?: number; height?: number; margin?: number } = {}): Uint8Array {
+  const W = opts.width ?? 612, H = opts.height ?? 792, M = opts.margin ?? 72
+  const doc = pdf(), textW = W - M * 2, bodySize = 11, lineH = bodySize * 1.5
+  type Item = { text: string; size: number; indent: number; spaceBefore: number; spaceAfter: number; rule?: boolean; color?: string }
+  const items: Item[] = []
+
+  const wrap = (text: string, size: number, maxW: number): string[] => {
+    const words = text.split(' '), lines: string[] = []
+    let line = ''
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word
+      if (measureText(test, size) <= maxW) line = test
+      else { if (line) lines.push(line); line = word }
+    }
+    if (line) lines.push(line)
+    return lines.length ? lines : ['']
+  }
+
+  let prevType = 'start'
+  for (const raw of md.split('\n')) {
+    const line = raw.trimEnd()
+    if (/^#{1,3}\s/.test(line)) {
+      const lvl = line.match(/^#+/)![0].length
+      const size = [22, 16, 13][lvl - 1]
+      const before = prevType === 'start' ? 0 : [14, 12, 10][lvl - 1]
+      const wrapped = wrap(line.slice(lvl + 1), size, textW)
+      wrapped.forEach((l, i) => items.push({ text: l, size, indent: 0, spaceBefore: i === 0 ? before : 0, spaceAfter: 4, color: '#111111' }))
+      prevType = 'header'
+    } else if (/^[-*]\s/.test(line)) {
+      const wrapped = wrap(line.slice(2), bodySize, textW - 18)
+      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? '- ' : '  ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      prevType = 'list'
+    } else if (/^\d+\.\s/.test(line)) {
+      const num = line.match(/^\d+/)![0]
+      const text = line.slice(num.length + 2)
+      const wrapped = wrap(text, bodySize, textW - 18)
+      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? num + '. ' : '   ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      prevType = 'list'
+    } else if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+      items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 8, spaceAfter: 8, rule: true })
+      prevType = 'rule'
+    } else if (line.trim() === '') {
+      if (prevType !== 'start' && prevType !== 'blank') items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4 })
+      prevType = 'blank'
+    } else {
+      const wrapped = wrap(line, bodySize, textW)
+      wrapped.forEach((l, i) => items.push({ text: l, size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4, color: '#111111' }))
+      prevType = 'para'
+    }
+  }
+
+  const pages: { items: Item[]; ys: number[] }[] = []
+  let y = H - M, pg: Item[] = [], ys: number[] = []
+  for (const item of items) {
+    const needed = item.spaceBefore + item.size + item.spaceAfter
+    if (y - needed < M) { pages.push({ items: pg, ys }); pg = []; ys = []; y = H - M }
+    y -= item.spaceBefore
+    ys.push(y); pg.push(item)
+    y -= item.size + item.spaceAfter
+  }
+  if (pg.length) pages.push({ items: pg, ys })
+
+  for (const { items: pi, ys: py } of pages) {
+    doc.page(W, H, ctx => {
+      pi.forEach((it, i) => {
+        if (it.rule) ctx.line(M, py[i], W - M, py[i], '#e0e0e0', 0.5)
+        else if (it.text) ctx.text(it.text, M + it.indent, py[i], it.size, { color: it.color })
+      })
+    })
+  }
+  return doc.build()
+}
+
 export default pdf
