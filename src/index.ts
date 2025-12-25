@@ -7,6 +7,91 @@ const WIDTHS: number[] = [
   556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584
 ]
 
+// Custom error classes
+export class TinyPDFError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TinyPDFError'
+  }
+}
+
+export class ValidationError extends TinyPDFError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+export class ImageError extends TinyPDFError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ImageError'
+  }
+}
+
+// Validation helpers
+function validateNumber(value: number, name: string): void {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new ValidationError(`${name} must be a finite number, got ${typeof value === 'number' ? value : typeof value}`)
+  }
+}
+
+function validatePositive(value: number, name: string): void {
+  validateNumber(value, name)
+  if (value <= 0) {
+    throw new ValidationError(`${name} must be positive, got ${value}`)
+  }
+}
+
+function validateNonNegative(value: number, name: string): void {
+  validateNumber(value, name)
+  if (value < 0) {
+    throw new ValidationError(`${name} must be non-negative, got ${value}`)
+  }
+}
+
+function validateString(value: string, name: string): void {
+  if (typeof value !== 'string') {
+    throw new ValidationError(`${name} must be a string, got ${typeof value}`)
+  }
+}
+
+function validateColor(hex: string): void {
+  if (hex === 'none') return
+  const cleaned = hex.replace('#', '')
+  if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(cleaned)) {
+    throw new ValidationError(`Invalid color format: "${hex}". Use hex format like "#ff0000" or "#f00"`)
+  }
+}
+
+function validateJPEG(bytes: Uint8Array): void {
+  if (!(bytes instanceof Uint8Array)) {
+    throw new ImageError('Image data must be a Uint8Array')
+  }
+  if (bytes.length < 2) {
+    throw new ImageError('Image data is too small to be a valid JPEG')
+  }
+  // Check SOI (Start of Image) marker
+  if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) {
+    throw new ImageError('Invalid JPEG: missing SOI marker (0xFFD8). Only JPEG images are supported')
+  }
+  // Check for EOI (End of Image) marker
+  if (bytes[bytes.length - 2] !== 0xFF || bytes[bytes.length - 1] !== 0xD9) {
+    throw new ImageError('Invalid JPEG: missing EOI marker (0xFFD9). File may be corrupted')
+  }
+}
+
+function validateURL(url: string): void {
+  validateString(url, 'URL')
+  if (url.trim() === '') {
+    throw new ValidationError('URL cannot be empty')
+  }
+  // Basic URL validation - allow common protocols
+  if (!/^(https?:\/\/|mailto:|tel:)/i.test(url)) {
+    throw new ValidationError(`Invalid URL: "${url}". URL must start with http://, https://, mailto:, or tel:`)
+  }
+}
+
 export interface TextOptions {
   align?: 'left' | 'center' | 'right'
   width?: number
@@ -118,9 +203,17 @@ export function pdf(): PDFBuilder {
       height = 792
       fn = widthOrFn
     } else {
+      validatePositive(widthOrFn, 'page width')
+      if (heightOrUndefined === undefined) {
+        throw new ValidationError('page height is required when width is specified')
+      }
+      validatePositive(heightOrUndefined, 'page height')
+      if (typeof fnOrUndefined !== 'function') {
+        throw new ValidationError('page callback function is required')
+      }
       width = widthOrFn
-      height = heightOrUndefined!
-      fn = fnOrUndefined!
+      height = heightOrUndefined
+      fn = fnOrUndefined
     }
 
     const ops: string[] = []
@@ -130,7 +223,14 @@ export function pdf(): PDFBuilder {
 
     const ctx: PageContext = {
       text(str: string, x: number, y: number, size: number, opts: TextOptions = {}) {
+        validateString(str, 'text')
+        validateNumber(x, 'x')
+        validateNumber(y, 'y')
+        validatePositive(size, 'font size')
+
         const { align = 'left', width: boxWidth, color = '#000000' } = opts
+        if (boxWidth !== undefined) validatePositive(boxWidth, 'width')
+        validateColor(color)
 
         let tx = x
         if (align !== 'left' && boxWidth !== undefined) {
@@ -149,6 +249,12 @@ export function pdf(): PDFBuilder {
       },
 
       rect(x: number, y: number, w: number, h: number, fill: string) {
+        validateNumber(x, 'x')
+        validateNumber(y, 'y')
+        validatePositive(w, 'width')
+        validatePositive(h, 'height')
+        validateColor(fill)
+
         const rgb = parseColor(fill)
         if (rgb) {
           ops.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} rg`)
@@ -158,6 +264,13 @@ export function pdf(): PDFBuilder {
       },
 
       line(x1: number, y1: number, x2: number, y2: number, stroke: string, lineWidth: number = 1) {
+        validateNumber(x1, 'x1')
+        validateNumber(y1, 'y1')
+        validateNumber(x2, 'x2')
+        validateNumber(y2, 'y2')
+        validateColor(stroke)
+        validatePositive(lineWidth, 'lineWidth')
+
         const rgb = parseColor(stroke)
         if (rgb) {
           ops.push(`${lineWidth.toFixed(2)} w`)
@@ -169,13 +282,25 @@ export function pdf(): PDFBuilder {
       },
 
       image(jpegBytes: Uint8Array, x: number, y: number, w: number, h: number) {
+        validateJPEG(jpegBytes)
+        validateNumber(x, 'x')
+        validateNumber(y, 'y')
+        validatePositive(w, 'width')
+        validatePositive(h, 'height')
+
         let imgWidth = 0, imgHeight = 0
+        let foundDimensions = false
         for (let i = 0; i < jpegBytes.length - 1; i++) {
           if (jpegBytes[i] === 0xFF && (jpegBytes[i + 1] === 0xC0 || jpegBytes[i + 1] === 0xC2)) {
             imgHeight = (jpegBytes[i + 5] << 8) | jpegBytes[i + 6]
             imgWidth = (jpegBytes[i + 7] << 8) | jpegBytes[i + 8]
+            foundDimensions = true
             break
           }
+        }
+
+        if (!foundDimensions || imgWidth === 0 || imgHeight === 0) {
+          throw new ImageError('Could not extract image dimensions from JPEG. File may be corrupted')
         }
 
         const imgName = `/Im${imageCount++}`
@@ -200,6 +325,13 @@ export function pdf(): PDFBuilder {
       },
 
       link(url: string, x: number, y: number, w: number, h: number, opts: LinkOptions = {}) {
+        validateURL(url)
+        validateNumber(x, 'x')
+        validateNumber(y, 'y')
+        validatePositive(w, 'width')
+        validatePositive(h, 'height')
+        if (opts.underline) validateColor(opts.underline)
+
         links.push({ url, rect: [x, y, x + w, y + h] })
         if (opts.underline) {
           const rgb = parseColor(opts.underline)

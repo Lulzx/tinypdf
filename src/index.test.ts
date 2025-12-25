@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { pdf, measureText, markdown } from './index'
+import { pdf, measureText, markdown, TinyPDFError, ValidationError, ImageError } from './index'
 
 describe('pdf', () => {
   test('creates a valid PDF with header', () => {
@@ -697,5 +697,337 @@ More text.`
     expect(str).toContain('paragraph')
     expect(str).toContain('Bullet')
     expect(str).toContain('Number')
+  })
+})
+
+describe('error classes', () => {
+  test('TinyPDFError is an Error', () => {
+    const err = new TinyPDFError('test')
+    expect(err).toBeInstanceOf(Error)
+    expect(err.name).toBe('TinyPDFError')
+    expect(err.message).toBe('test')
+  })
+
+  test('ValidationError extends TinyPDFError', () => {
+    const err = new ValidationError('test')
+    expect(err).toBeInstanceOf(TinyPDFError)
+    expect(err).toBeInstanceOf(Error)
+    expect(err.name).toBe('ValidationError')
+  })
+
+  test('ImageError extends TinyPDFError', () => {
+    const err = new ImageError('test')
+    expect(err).toBeInstanceOf(TinyPDFError)
+    expect(err).toBeInstanceOf(Error)
+    expect(err.name).toBe('ImageError')
+  })
+})
+
+describe('text validation', () => {
+  test('throws on invalid x coordinate', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', NaN, 700, 12)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid y coordinate', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', 50, Infinity, 12)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on non-positive font size', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', 50, 700, 0)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on negative font size', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', 50, 700, -12)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid color format', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', 50, 700, 12, { color: 'red' })
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid width option', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.text('Hello', 50, 700, 12, { width: -100 })
+      })
+    }).toThrow(ValidationError)
+  })
+})
+
+describe('rect validation', () => {
+  test('throws on non-positive width', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.rect(50, 700, 0, 100, '#ff0000')
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on non-positive height', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.rect(50, 700, 100, -50, '#ff0000')
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid color', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.rect(50, 700, 100, 100, 'invalid')
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('accepts valid 3-char hex color', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.rect(50, 700, 100, 100, '#f00')
+      })
+      doc.build()
+    }).not.toThrow()
+  })
+})
+
+describe('line validation', () => {
+  test('throws on invalid coordinates', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.line(NaN, 700, 250, 700, '#000000')
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on non-positive lineWidth', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.line(50, 700, 250, 700, '#000000', 0)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid stroke color', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.line(50, 700, 250, 700, 'blue')
+      })
+    }).toThrow(ValidationError)
+  })
+})
+
+describe('image validation', () => {
+  test('throws on non-Uint8Array input', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image([] as any, 50, 700, 100, 100)
+      })
+    }).toThrow(ImageError)
+  })
+
+  test('throws on empty Uint8Array', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image(new Uint8Array([]), 50, 700, 100, 100)
+      })
+    }).toThrow(ImageError)
+  })
+
+  test('throws on invalid JPEG (missing SOI marker)', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image(new Uint8Array([0x00, 0x00, 0xFF, 0xD9]), 50, 700, 100, 100)
+      })
+    }).toThrow(ImageError)
+  })
+
+  test('throws on invalid JPEG (missing EOI marker)', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image(new Uint8Array([0xFF, 0xD8, 0x00, 0x00]), 50, 700, 100, 100)
+      })
+    }).toThrow(ImageError)
+  })
+
+  test('throws on non-positive width', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image(new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9]), 50, 700, 0, 100)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on non-positive height', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.image(new Uint8Array([0xFF, 0xD8, 0xFF, 0xD9]), 50, 700, 100, -50)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('error message mentions JPEG only support', () => {
+    const doc = pdf()
+    try {
+      doc.page((ctx) => {
+        // PNG magic bytes
+        ctx.image(new Uint8Array([0x89, 0x50, 0x4E, 0x47]), 50, 700, 100, 100)
+      })
+    } catch (e: any) {
+      expect(e.message).toContain('JPEG')
+    }
+  })
+})
+
+describe('link validation', () => {
+  test('throws on empty URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('', 50, 700, 100, 20)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid URL protocol', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('ftp://example.com', 50, 700, 100, 20)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on relative URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('/path/to/page', 50, 700, 100, 20)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('accepts http URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('http://example.com', 50, 700, 100, 20)
+      })
+      doc.build()
+    }).not.toThrow()
+  })
+
+  test('accepts https URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('https://example.com', 50, 700, 100, 20)
+      })
+      doc.build()
+    }).not.toThrow()
+  })
+
+  test('accepts mailto URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('mailto:test@example.com', 50, 700, 100, 20)
+      })
+      doc.build()
+    }).not.toThrow()
+  })
+
+  test('accepts tel URL', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('tel:+1234567890', 50, 700, 100, 20)
+      })
+      doc.build()
+    }).not.toThrow()
+  })
+
+  test('throws on non-positive width', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('https://example.com', 50, 700, 0, 20)
+      })
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on invalid underline color', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page((ctx) => {
+        ctx.link('https://example.com', 50, 700, 100, 20, { underline: 'blue' })
+      })
+    }).toThrow(ValidationError)
+  })
+})
+
+describe('page validation', () => {
+  test('throws on non-positive page width', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page(0, 792, () => {})
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on non-positive page height', () => {
+    const doc = pdf()
+    expect(() => {
+      doc.page(612, -100, () => {})
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on missing height when width is provided', () => {
+    const doc = pdf()
+    expect(() => {
+      (doc.page as any)(612)
+    }).toThrow(ValidationError)
+  })
+
+  test('throws on missing callback when dimensions provided', () => {
+    const doc = pdf()
+    expect(() => {
+      (doc.page as any)(612, 792)
+    }).toThrow(ValidationError)
   })
 })
