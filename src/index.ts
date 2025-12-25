@@ -455,10 +455,32 @@ export function pdf(): PDFBuilder {
   return { page, build, measureText }
 }
 
-export function markdown(md: string, opts: { width?: number; height?: number; margin?: number } = {}): Uint8Array {
+export interface MarkdownOptions {
+  width?: number
+  height?: number
+  margin?: number
+  images?: Record<string, Uint8Array>
+}
+
+function getJpegDimensions(bytes: Uint8Array): { width: number; height: number } | null {
+  for (let i = 0; i < bytes.length - 1; i++) {
+    if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC2)) {
+      const height = (bytes[i + 5] << 8) | bytes[i + 6]
+      const width = (bytes[i + 7] << 8) | bytes[i + 8]
+      if (width > 0 && height > 0) return { width, height }
+    }
+  }
+  return null
+}
+
+export function markdown(md: string, opts: MarkdownOptions = {}): Uint8Array {
   const W = opts.width ?? 612, H = opts.height ?? 792, M = opts.margin ?? 72
-  const doc = pdf(), textW = W - M * 2, bodySize = 11, lineH = bodySize * 1.5
-  type Item = { text: string; size: number; indent: number; spaceBefore: number; spaceAfter: number; rule?: boolean; color?: string }
+  const images = opts.images ?? {}
+  const doc = pdf(), textW = W - M * 2, bodySize = 11
+
+  type TextItem = { type: 'text'; text: string; size: number; indent: number; spaceBefore: number; spaceAfter: number; rule?: boolean; color?: string }
+  type ImageItem = { type: 'image'; bytes: Uint8Array; width: number; height: number; spaceBefore: number; spaceAfter: number }
+  type Item = TextItem | ImageItem
   const items: Item[] = []
 
   const wrap = (text: string, size: number, maxW: number): string[] => {
@@ -476,32 +498,73 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
   let prevType = 'start'
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd()
+
+    // Check for image syntax: ![alt](path)
+    const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+    if (imgMatch) {
+      const path = imgMatch[2]
+      const imgBytes = images[path]
+      if (imgBytes) {
+        const dims = getJpegDimensions(imgBytes)
+        if (dims) {
+          // Scale to fit within textW while maintaining aspect ratio
+          let imgW = dims.width
+          let imgH = dims.height
+          if (imgW > textW) {
+            const scale = textW / imgW
+            imgW = textW
+            imgH = dims.height * scale
+          }
+          // Cap max height to avoid oversized images
+          const maxH = (H - M * 2) * 0.6
+          if (imgH > maxH) {
+            const scale = maxH / imgH
+            imgH = maxH
+            imgW = imgW * scale
+          }
+          items.push({
+            type: 'image',
+            bytes: imgBytes,
+            width: imgW,
+            height: imgH,
+            spaceBefore: prevType === 'start' ? 0 : 8,
+            spaceAfter: 8
+          })
+          prevType = 'image'
+          continue
+        }
+      }
+      // Image not found, skip silently
+      prevType = 'blank'
+      continue
+    }
+
     if (/^#{1,3}\s/.test(line)) {
       const lvl = line.match(/^#+/)![0].length
       const size = [22, 16, 13][lvl - 1]
       const before = prevType === 'start' ? 0 : [14, 12, 10][lvl - 1]
       const wrapped = wrap(line.slice(lvl + 1), size, textW)
-      wrapped.forEach((l, i) => items.push({ text: l, size, indent: 0, spaceBefore: i === 0 ? before : 0, spaceAfter: 4, color: '#111111' }))
+      wrapped.forEach((l, i) => items.push({ type: 'text', text: l, size, indent: 0, spaceBefore: i === 0 ? before : 0, spaceAfter: 4, color: '#111111' }))
       prevType = 'header'
     } else if (/^[-*]\s/.test(line)) {
       const wrapped = wrap(line.slice(2), bodySize, textW - 18)
-      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? '- ' : '  ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      wrapped.forEach((l, i) => items.push({ type: 'text', text: (i === 0 ? '- ' : '  ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
       prevType = 'list'
     } else if (/^\d+\.\s/.test(line)) {
       const num = line.match(/^\d+/)![0]
       const text = line.slice(num.length + 2)
       const wrapped = wrap(text, bodySize, textW - 18)
-      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? num + '. ' : '   ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      wrapped.forEach((l, i) => items.push({ type: 'text', text: (i === 0 ? num + '. ' : '   ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
       prevType = 'list'
     } else if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
-      items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 8, spaceAfter: 8, rule: true })
+      items.push({ type: 'text', text: '', size: bodySize, indent: 0, spaceBefore: 8, spaceAfter: 8, rule: true })
       prevType = 'rule'
     } else if (line.trim() === '') {
-      if (prevType !== 'start' && prevType !== 'blank') items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4 })
+      if (prevType !== 'start' && prevType !== 'blank') items.push({ type: 'text', text: '', size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4 })
       prevType = 'blank'
     } else {
       const wrapped = wrap(line, bodySize, textW)
-      wrapped.forEach((l, i) => items.push({ text: l, size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4, color: '#111111' }))
+      wrapped.forEach((l, i) => items.push({ type: 'text', text: l, size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4, color: '#111111' }))
       prevType = 'para'
     }
   }
@@ -509,19 +572,26 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
   const pages: { items: Item[]; ys: number[] }[] = []
   let y = H - M, pg: Item[] = [], ys: number[] = []
   for (const item of items) {
-    const needed = item.spaceBefore + item.size + item.spaceAfter
+    const itemHeight = item.type === 'image' ? item.height : item.size
+    const needed = item.spaceBefore + itemHeight + item.spaceAfter
     if (y - needed < M) { pages.push({ items: pg, ys }); pg = []; ys = []; y = H - M }
     y -= item.spaceBefore
     ys.push(y); pg.push(item)
-    y -= item.size + item.spaceAfter
+    y -= itemHeight + item.spaceAfter
   }
   if (pg.length) pages.push({ items: pg, ys })
 
   for (const { items: pi, ys: py } of pages) {
     doc.page(W, H, ctx => {
       pi.forEach((it, i) => {
-        if (it.rule) ctx.line(M, py[i], W - M, py[i], '#e0e0e0', 0.5)
-        else if (it.text) ctx.text(it.text, M + it.indent, py[i], it.size, { color: it.color })
+        if (it.type === 'image') {
+          // y position is top of image, but ctx.image uses bottom-left
+          ctx.image(it.bytes, M, py[i] - it.height, it.width, it.height)
+        } else if (it.rule) {
+          ctx.line(M, py[i], W - M, py[i], '#e0e0e0', 0.5)
+        } else if (it.text) {
+          ctx.text(it.text, M + it.indent, py[i], it.size, { color: it.color })
+        }
       })
     })
   }
