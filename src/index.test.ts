@@ -354,6 +354,70 @@ describe('link', () => {
   })
 })
 
+describe('image validation', () => {
+  test('throws for non-JPEG data', () => {
+    const doc = pdf()
+    const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47]) // PNG header
+    doc.page((ctx) => {
+      expect(() => ctx.image(png, 0, 0, 100, 100)).toThrow('missing SOI marker')
+    })
+    doc.build()
+  })
+
+  test('throws for empty data', () => {
+    const doc = pdf()
+    doc.page((ctx) => {
+      expect(() => ctx.image(new Uint8Array([]), 0, 0, 100, 100)).toThrow('missing SOI marker')
+    })
+    doc.build()
+  })
+
+  test('throws for JPEG with no SOF marker', () => {
+    const doc = pdf()
+    // Valid SOI but no SOF marker following
+    const noSof = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x02, 0x00, 0x00])
+    doc.page((ctx) => {
+      expect(() => ctx.image(noSof, 0, 0, 100, 100)).toThrow('no valid SOF marker')
+    })
+    doc.build()
+  })
+
+  test('throws when SOF marker is truncated near end of buffer', () => {
+    const doc = pdf()
+    // SOI + SOF marker at very end, not enough bytes for dimensions
+    const truncated = new Uint8Array([0xFF, 0xD8, 0xFF, 0xC0, 0x00])
+    doc.page((ctx) => {
+      expect(() => ctx.image(truncated, 0, 0, 100, 100)).toThrow('no valid SOF marker')
+    })
+    doc.build()
+  })
+
+  test('uses DeviceGray for 1-component JPEG', () => {
+    // Build a minimal JPEG with SOI + SOF0 having 1 component
+    const gray = new Uint8Array([
+      0xFF, 0xD8,                                           // SOI
+      0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, // SOF: 1x1, 1 component
+      0x01, 0x11, 0x00
+    ])
+    const doc = pdf()
+    doc.page((ctx) => { ctx.image(gray, 0, 0, 50, 50) })
+    const str = new TextDecoder().decode(doc.build())
+    expect(str).toContain('/ColorSpace /DeviceGray')
+  })
+
+  test('uses DeviceCMYK for 4-component JPEG', () => {
+    const cmyk = new Uint8Array([
+      0xFF, 0xD8,                                           // SOI
+      0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x04, // SOF: 1x1, 4 components
+      0x01, 0x11, 0x00
+    ])
+    const doc = pdf()
+    doc.page((ctx) => { ctx.image(cmyk, 0, 0, 50, 50) })
+    const str = new TextDecoder().decode(doc.build())
+    expect(str).toContain('/ColorSpace /DeviceCMYK')
+  })
+})
+
 describe('image', () => {
   // Minimal valid JPEG (1x1 red pixel)
   const minimalJpeg = new Uint8Array([
@@ -576,6 +640,28 @@ describe('color parsing', () => {
     const str = new TextDecoder().decode(bytes)
     expect(str).toContain('1.000 0.000 0.000 rg')
   })
+
+  test('ignores invalid hex color', () => {
+    const doc = pdf()
+    doc.page((ctx) => {
+      ctx.rect(0, 0, 100, 100, 'xyz')
+    })
+    const bytes = doc.build()
+    const str = new TextDecoder().decode(bytes)
+    expect(str).not.toContain('NaN')
+    expect(str).not.toContain(' re')
+  })
+
+  test('ignores invalid 6-char non-hex color', () => {
+    const doc = pdf()
+    doc.page((ctx) => {
+      ctx.rect(0, 0, 100, 100, '#gggggg')
+    })
+    const bytes = doc.build()
+    const str = new TextDecoder().decode(bytes)
+    expect(str).not.toContain('NaN')
+    expect(str).not.toContain(' re')
+  })
 })
 
 describe('markdown', () => {
@@ -608,6 +694,28 @@ describe('markdown', () => {
     const bytes = markdown('### Section')
     const str = new TextDecoder().decode(bytes)
     expect(str).toContain('(Section) Tj')
+    expect(str).toContain('/F1 13 Tf')
+  })
+
+  test('renders h4 heading as h3 size', () => {
+    const bytes = markdown('#### Subsection')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Subsection) Tj')
+    expect(str).toContain('/F1 13 Tf')
+    expect(str).not.toContain('NaN')
+  })
+
+  test('renders h5 heading without NaN', () => {
+    const bytes = markdown('##### Deep')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Deep) Tj')
+    expect(str).toContain('/F1 13 Tf')
+  })
+
+  test('renders h6 heading without NaN', () => {
+    const bytes = markdown('###### Deepest')
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('(Deepest) Tj')
     expect(str).toContain('/F1 13 Tf')
   })
 
