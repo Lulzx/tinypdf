@@ -44,8 +44,7 @@ export function measureText(str: string, size: number): number {
   let width = 0
   for (let i = 0; i < str.length; i++) {
     const code = str.charCodeAt(i)
-    const w = (code >= 32 && code <= 126) ? WIDTHS[code - 32] : 556
-    width += w
+    width += (code >= 32 && code <= 126) ? WIDTHS[code - 32] : 556
   }
   return (width * size) / 1000
 }
@@ -53,13 +52,29 @@ export function measureText(str: string, size: number): number {
 function parseColor(hex: string | undefined): number[] | null {
   if (!hex || hex === 'none') return null
   hex = hex.replace('#', '')
-  if (hex.length === 3) {
-    hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
+  if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
+  return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255]
+}
+
+function colorOp(rgb: number[] | null, op: string): string {
+  return rgb ? `${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} ${op}` : ''
+}
+
+function parseJpeg(bytes: Uint8Array): { width: number; height: number; colorSpace: string } {
+  if (bytes.length < 2 || bytes[0] !== 0xFF || bytes[1] !== 0xD8)
+    throw new Error('Invalid JPEG: missing SOI marker')
+  for (let i = 0; i < bytes.length - 1; i++) {
+    if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC2)) {
+      if (i + 9 >= bytes.length) break
+      const height = (bytes[i + 5] << 8) | bytes[i + 6]
+      const width = (bytes[i + 7] << 8) | bytes[i + 8]
+      const c = bytes[i + 9]
+      if (width && height)
+        return { width, height, colorSpace: c === 1 ? '/DeviceGray' : c === 4 ? '/DeviceCMYK' : '/DeviceRGB' }
+    }
   }
-  const r = parseInt(hex.slice(0, 2), 16) / 255
-  const g = parseInt(hex.slice(2, 4), 16) / 255
-  const b = parseInt(hex.slice(4, 6), 16) / 255
-  return [r, g, b]
+  throw new Error('Invalid JPEG: no valid SOF marker found')
 }
 
 function pdfString(str: string): string {
@@ -76,8 +91,8 @@ function serialize(val: PDFValue): string {
   if (typeof val === 'boolean') return val ? 'true' : 'false'
   if (typeof val === 'number') return Number.isInteger(val) ? String(val) : val.toFixed(4).replace(/\.?0+$/, '')
   if (typeof val === 'string') {
-    if (val.startsWith('/')) return val  // name
-    if (val.startsWith('(')) return val  // already escaped string
+    if (val.startsWith('/')) return val
+    if (val.startsWith('(')) return val
     return pdfString(val)
   }
   if (Array.isArray(val)) return '[' + val.map(serialize).join(' ') + ']'
@@ -99,7 +114,6 @@ class Ref {
 export function pdf(): PDFBuilder {
   const objects: PDFObject[] = []
   const pages: Ref[] = []
-
   let nextId = 1
 
   function addObject(dict: Record<string, PDFValue>, streamBytes: Uint8Array | null = null): Ref {
@@ -109,19 +123,9 @@ export function pdf(): PDFBuilder {
   }
 
   function page(widthOrFn: number | ((ctx: PageContext) => void), heightOrUndefined?: number, fnOrUndefined?: (ctx: PageContext) => void): void {
-    let width: number
-    let height: number
-    let fn: (ctx: PageContext) => void
-
-    if (typeof widthOrFn === 'function') {
-      width = 612
-      height = 792
-      fn = widthOrFn
-    } else {
-      width = widthOrFn
-      height = heightOrUndefined!
-      fn = fnOrUndefined!
-    }
+    let width: number, height: number, fn: (ctx: PageContext) => void
+    if (typeof widthOrFn === 'function') { width = 612; height = 792; fn = widthOrFn }
+    else { width = widthOrFn; height = heightOrUndefined!; fn = fnOrUndefined! }
 
     const ops: string[] = []
     const images: { name: string; ref: Ref }[] = []
@@ -129,86 +133,50 @@ export function pdf(): PDFBuilder {
     let imageCount = 0
 
     const ctx: PageContext = {
-      text(str: string, x: number, y: number, size: number, opts: TextOptions = {}) {
+      text(str, x, y, size, opts: TextOptions = {}) {
         const { align = 'left', width: boxWidth, color = '#000000' } = opts
-
         let tx = x
         if (align !== 'left' && boxWidth !== undefined) {
-          const textWidth = measureText(str, size)
-          if (align === 'center') tx = x + (boxWidth - textWidth) / 2
-          if (align === 'right') tx = x + boxWidth - textWidth
+          const tw = measureText(str, size)
+          if (align === 'center') tx = x + (boxWidth - tw) / 2
+          if (align === 'right') tx = x + boxWidth - tw
         }
-
-        const rgb = parseColor(color)
-        if (rgb) ops.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} rg`)
-        ops.push('BT')
-        ops.push(`/F1 ${size} Tf`)
-        ops.push(`${tx.toFixed(2)} ${y.toFixed(2)} Td`)
-        ops.push(`${pdfString(str)} Tj`)
-        ops.push('ET')
+        const c = colorOp(parseColor(color), 'rg')
+        if (c) ops.push(c)
+        ops.push('BT', `/F1 ${size} Tf`, `${tx.toFixed(2)} ${y.toFixed(2)} Td`, `${pdfString(str)} Tj`, 'ET')
       },
 
-      rect(x: number, y: number, w: number, h: number, fill: string) {
-        const rgb = parseColor(fill)
-        if (rgb) {
-          ops.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} rg`)
-          ops.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re`)
-          ops.push('f')
+      rect(x, y, w, h, fill) {
+        const c = colorOp(parseColor(fill), 'rg')
+        if (c) {
+          ops.push(c, `${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re`, 'f')
         }
       },
 
-      line(x1: number, y1: number, x2: number, y2: number, stroke: string, lineWidth: number = 1) {
-        const rgb = parseColor(stroke)
-        if (rgb) {
-          ops.push(`${lineWidth.toFixed(2)} w`)
-          ops.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} RG`)
-          ops.push(`${x1.toFixed(2)} ${y1.toFixed(2)} m`)
-          ops.push(`${x2.toFixed(2)} ${y2.toFixed(2)} l`)
-          ops.push('S')
+      line(x1, y1, x2, y2, stroke, lineWidth = 1) {
+        const c = colorOp(parseColor(stroke), 'RG')
+        if (c) {
+          ops.push(`${lineWidth.toFixed(2)} w`, c, `${x1.toFixed(2)} ${y1.toFixed(2)} m`, `${x2.toFixed(2)} ${y2.toFixed(2)} l`, 'S')
         }
       },
 
-      image(jpegBytes: Uint8Array, x: number, y: number, w: number, h: number) {
-        let imgWidth = 0, imgHeight = 0
-        for (let i = 0; i < jpegBytes.length - 1; i++) {
-          if (jpegBytes[i] === 0xFF && (jpegBytes[i + 1] === 0xC0 || jpegBytes[i + 1] === 0xC2)) {
-            imgHeight = (jpegBytes[i + 5] << 8) | jpegBytes[i + 6]
-            imgWidth = (jpegBytes[i + 7] << 8) | jpegBytes[i + 8]
-            break
-          }
-        }
-
+      image(jpegBytes, x, y, w, h) {
+        const { width: imgW, height: imgH, colorSpace } = parseJpeg(jpegBytes)
         const imgName = `/Im${imageCount++}`
-
         const imgRef = addObject({
-          Type: '/XObject',
-          Subtype: '/Image',
-          Width: imgWidth,
-          Height: imgHeight,
-          ColorSpace: '/DeviceRGB',
-          BitsPerComponent: 8,
-          Filter: '/DCTDecode',
-          Length: jpegBytes.length
+          Type: '/XObject', Subtype: '/Image', Width: imgW, Height: imgH,
+          ColorSpace: colorSpace, BitsPerComponent: 8, Filter: '/DCTDecode', Length: jpegBytes.length
         }, jpegBytes)
-
         images.push({ name: imgName, ref: imgRef })
-
-        ops.push('q')
-        ops.push(`${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`)
-        ops.push(`${imgName} Do`)
-        ops.push('Q')
+        ops.push('q', `${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm`, `${imgName} Do`, 'Q')
       },
 
-      link(url: string, x: number, y: number, w: number, h: number, opts: LinkOptions = {}) {
+      link(url, x, y, w, h, opts: LinkOptions = {}) {
         links.push({ url, rect: [x, y, x + w, y + h] })
         if (opts.underline) {
-          const rgb = parseColor(opts.underline)
-          if (rgb) {
-            ops.push(`0.75 w`)
-            ops.push(`${rgb[0].toFixed(3)} ${rgb[1].toFixed(3)} ${rgb[2].toFixed(3)} RG`)
-            ops.push(`${x.toFixed(2)} ${(y + 2).toFixed(2)} m`)
-            ops.push(`${(x + w).toFixed(2)} ${(y + 2).toFixed(2)} l`)
-            ops.push('S')
+          const c = colorOp(parseColor(opts.underline), 'RG')
+          if (c) {
+            ops.push('0.75 w', c, `${x.toFixed(2)} ${(y + 2).toFixed(2)} m`, `${(x + w).toFixed(2)} ${(y + 2).toFixed(2)} l`, 'S')
           }
         }
       }
@@ -221,102 +189,63 @@ export function pdf(): PDFBuilder {
     const contentRef = addObject({ Length: contentBytes.length }, contentBytes)
 
     const xobjects: Record<string, Ref> = {}
-    for (const img of images) {
-      xobjects[img.name.slice(1)] = img.ref
-    }
+    for (const img of images) xobjects[img.name.slice(1)] = img.ref
 
     const annots: Ref[] = links.map(lnk => addObject({
-      Type: '/Annot',
-      Subtype: '/Link',
-      Rect: lnk.rect,
-      Border: [0, 0, 0],
+      Type: '/Annot', Subtype: '/Link', Rect: lnk.rect, Border: [0, 0, 0],
       A: { Type: '/Action', S: '/URI', URI: lnk.url }
     }))
 
-    const pageRef = addObject({
-      Type: '/Page',
-      Parent: null,
-      MediaBox: [0, 0, width, height],
+    pages.push(addObject({
+      Type: '/Page', Parent: null, MediaBox: [0, 0, width, height],
       Contents: contentRef,
-      Resources: {
-        Font: { F1: null },
-        XObject: Object.keys(xobjects).length > 0 ? xobjects : undefined
-      },
+      Resources: { Font: { F1: null }, XObject: Object.keys(xobjects).length > 0 ? xobjects : undefined },
       Annots: annots.length > 0 ? annots : undefined
-    })
-
-    pages.push(pageRef)
+    }))
   }
 
   function build(): Uint8Array {
-    const fontRef = addObject({
-      Type: '/Font',
-      Subtype: '/Type1',
-      BaseFont: '/Helvetica'
-    })
-
-    const pagesRef = addObject({
-      Type: '/Pages',
-      Kids: pages,
-      Count: pages.length
-    })
+    const fontRef = addObject({ Type: '/Font', Subtype: '/Type1', BaseFont: '/Helvetica' })
+    const pagesRef = addObject({ Type: '/Pages', Kids: pages, Count: pages.length })
 
     for (const obj of objects) {
       if (obj.dict.Type === '/Page') {
         obj.dict.Parent = pagesRef
         const resources = obj.dict.Resources as Record<string, PDFValue> | undefined
-        if (resources?.Font) {
-          (resources.Font as Record<string, PDFValue>).F1 = fontRef
-        }
+        if (resources?.Font) (resources.Font as Record<string, PDFValue>).F1 = fontRef
       }
     }
 
-    const catalogRef = addObject({
-      Type: '/Catalog',
-      Pages: pagesRef
-    })
-
-    const parts: (string | Uint8Array)[] = []
+    const catalogRef = addObject({ Type: '/Catalog', Pages: pagesRef })
+    const enc = new TextEncoder()
+    const chunks: Uint8Array[] = []
     const offsets: number[] = []
+    let byteOffset = 0
 
-    parts.push('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n')
+    const push = (data: string | Uint8Array) => {
+      const bytes = typeof data === 'string' ? enc.encode(data) : data
+      chunks.push(bytes); byteOffset += bytes.length
+    }
 
+    push('%PDF-1.4\n%\xFF\xFF\xFF\xFF\n')
     for (const obj of objects) {
-      offsets[obj.id] = parts.reduce((sum, p) => sum + (typeof p === 'string' ? new TextEncoder().encode(p).length : p.length), 0)
-
-      let content = `${obj.id} 0 obj\n${serialize(obj.dict)}\n`
-      if (obj.stream) {
-        content += 'stream\n'
-        parts.push(content)
-        parts.push(obj.stream)
-        parts.push('\nendstream\nendobj\n')
-      } else {
-        content += 'endobj\n'
-        parts.push(content)
-      }
+      offsets[obj.id] = byteOffset
+      let head = `${obj.id} 0 obj\n${serialize(obj.dict)}\n`
+      if (obj.stream) { push(head + 'stream\n'); push(obj.stream); push('\nendstream\nendobj\n') }
+      else push(head + 'endobj\n')
     }
 
-    const xrefOffset = parts.reduce((sum, p) => sum + (typeof p === 'string' ? new TextEncoder().encode(p).length : p.length), 0)
-
-    let xref = `xref\n0 ${objects.length + 1}\n`
-    xref += '0000000000 65535 f \n'
-    for (let i = 1; i <= objects.length; i++) {
+    const xrefOffset = byteOffset
+    let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+    for (let i = 1; i <= objects.length; i++)
       xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n'
-    }
-    parts.push(xref)
+    push(xref)
+    push(`trailer\n${serialize({ Size: objects.length + 1, Root: catalogRef })}\n`)
+    push(`startxref\n${xrefOffset}\n%%EOF\n`)
 
-    parts.push(`trailer\n${serialize({ Size: objects.length + 1, Root: catalogRef })}\n`)
-    parts.push(`startxref\n${xrefOffset}\n%%EOF\n`)
-
-    const totalLength = parts.reduce((sum, p) => sum + (typeof p === 'string' ? new TextEncoder().encode(p).length : p.length), 0)
-    const result = new Uint8Array(totalLength)
+    const result = new Uint8Array(byteOffset)
     let offset = 0
-    for (const part of parts) {
-      const bytes = typeof part === 'string' ? new TextEncoder().encode(part) : part
-      result.set(bytes, offset)
-      offset += bytes.length
-    }
-
+    for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length }
     return result
   }
 
@@ -325,7 +254,7 @@ export function pdf(): PDFBuilder {
 
 export function markdown(md: string, opts: { width?: number; height?: number; margin?: number } = {}): Uint8Array {
   const W = opts.width ?? 612, H = opts.height ?? 792, M = opts.margin ?? 72
-  const doc = pdf(), textW = W - M * 2, bodySize = 11, lineH = bodySize * 1.5
+  const doc = pdf(), textW = W - M * 2, bodySize = 11
   type Item = { text: string; size: number; indent: number; spaceBefore: number; spaceAfter: number; rule?: boolean; color?: string }
   const items: Item[] = []
 
@@ -333,6 +262,15 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
     const words = text.split(' '), lines: string[] = []
     let line = ''
     for (const word of words) {
+      if (measureText(word, size) > maxW) {
+        if (line) { lines.push(line); line = '' }
+        let chunk = ''
+        for (const ch of word) {
+          if (measureText(chunk + ch, size) > maxW && chunk) { lines.push(chunk); chunk = '' }
+          chunk += ch
+        }
+        line = chunk; continue
+      }
       const test = line ? line + ' ' + word : word
       if (measureText(test, size) <= maxW) line = test
       else { if (line) lines.push(line); line = word }
@@ -344,32 +282,33 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
   let prevType = 'start'
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd()
-    if (/^#{1,3}\s/.test(line)) {
-      const lvl = line.match(/^#+/)![0].length
+    if (/^#{1,6}\s/.test(line)) {
+      const rawLvl = line.match(/^#+/)![0].length
+      const lvl = Math.min(rawLvl, 3)
       const size = [22, 16, 13][lvl - 1]
       const before = prevType === 'start' ? 0 : [14, 12, 10][lvl - 1]
-      const wrapped = wrap(line.slice(lvl + 1), size, textW)
-      wrapped.forEach((l, i) => items.push({ text: l, size, indent: 0, spaceBefore: i === 0 ? before : 0, spaceAfter: 4, color: '#111111' }))
+      wrap(line.slice(rawLvl + 1), size, textW).forEach((l, i) =>
+        items.push({ text: l, size, indent: 0, spaceBefore: i === 0 ? before : 0, spaceAfter: 4, color: '#111111' }))
       prevType = 'header'
     } else if (/^[-*]\s/.test(line)) {
-      const wrapped = wrap(line.slice(2), bodySize, textW - 18)
-      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? '- ' : '  ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      wrap(line.slice(2), bodySize, textW - 18).forEach((l, i) =>
+        items.push({ text: (i === 0 ? '- ' : '  ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
       prevType = 'list'
     } else if (/^\d+\.\s/.test(line)) {
       const num = line.match(/^\d+/)![0]
-      const text = line.slice(num.length + 2)
-      const wrapped = wrap(text, bodySize, textW - 18)
-      wrapped.forEach((l, i) => items.push({ text: (i === 0 ? num + '. ' : '   ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
+      wrap(line.slice(num.length + 2), bodySize, textW - 18).forEach((l, i) =>
+        items.push({ text: (i === 0 ? num + '. ' : '   ') + l, size: bodySize, indent: 12, spaceBefore: 0, spaceAfter: 2 }))
       prevType = 'list'
     } else if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
       items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 8, spaceAfter: 8, rule: true })
       prevType = 'rule'
     } else if (line.trim() === '') {
-      if (prevType !== 'start' && prevType !== 'blank') items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4 })
+      if (prevType !== 'start' && prevType !== 'blank')
+        items.push({ text: '', size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4 })
       prevType = 'blank'
     } else {
-      const wrapped = wrap(line, bodySize, textW)
-      wrapped.forEach((l, i) => items.push({ text: l, size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4, color: '#111111' }))
+      wrap(line, bodySize, textW).forEach((l) =>
+        items.push({ text: l, size: bodySize, indent: 0, spaceBefore: 0, spaceAfter: 4, color: '#111111' }))
       prevType = 'para'
     }
   }
@@ -379,9 +318,7 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
   for (const item of items) {
     const needed = item.spaceBefore + item.size + item.spaceAfter
     if (y - needed < M) { pages.push({ items: pg, ys }); pg = []; ys = []; y = H - M }
-    y -= item.spaceBefore
-    ys.push(y); pg.push(item)
-    y -= item.size + item.spaceAfter
+    y -= item.spaceBefore; ys.push(y); pg.push(item); y -= item.size + item.spaceAfter
   }
   if (pg.length) pages.push({ items: pg, ys })
 
