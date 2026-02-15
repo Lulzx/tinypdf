@@ -51,7 +51,7 @@ export function measureText(str: string, size: number): number {
 
 function parseColor(hex: string | undefined): number[] | null {
   if (!hex || hex === 'none') return null
-  hex = hex.replace('#', '')
+  hex = hex.replace(/^#/, '')
   if (hex.length === 3) hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2]
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
   return [parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255]
@@ -64,8 +64,12 @@ function colorOp(rgb: number[] | null, op: string): string {
 function parseJpeg(bytes: Uint8Array): { width: number; height: number; colorSpace: string } {
   if (bytes.length < 2 || bytes[0] !== 0xFF || bytes[1] !== 0xD8)
     throw new Error('Invalid JPEG: missing SOI marker')
-  for (let i = 0; i < bytes.length - 1; i++) {
-    if (bytes[i] === 0xFF && (bytes[i + 1] === 0xC0 || bytes[i + 1] === 0xC2)) {
+  let i = 2
+  while (i < bytes.length - 1) {
+    if (bytes[i] !== 0xFF) { i++; continue }
+    const marker = bytes[i + 1]
+    if (marker === 0xDA) break // SOS — compressed data follows, stop scanning
+    if (marker === 0xC0 || marker === 0xC2) {
       if (i + 9 >= bytes.length) break
       const height = (bytes[i + 5] << 8) | bytes[i + 6]
       const width = (bytes[i + 7] << 8) | bytes[i + 8]
@@ -73,6 +77,9 @@ function parseJpeg(bytes: Uint8Array): { width: number; height: number; colorSpa
       if (width && height)
         return { width, height, colorSpace: c === 1 ? '/DeviceGray' : c === 4 ? '/DeviceCMYK' : '/DeviceRGB' }
     }
+    if (i + 3 >= bytes.length) break
+    const len = (bytes[i + 2] << 8) | bytes[i + 3]
+    i += 2 + len
   }
   throw new Error('Invalid JPEG: no valid SOF marker found')
 }
@@ -141,9 +148,8 @@ export function pdf(): PDFBuilder {
           if (align === 'center') tx = x + (boxWidth - tw) / 2
           if (align === 'right') tx = x + boxWidth - tw
         }
-        const c = colorOp(parseColor(color), 'rg')
-        if (c) ops.push(c)
-        ops.push('BT', `/F1 ${size} Tf`, `${tx.toFixed(2)} ${y.toFixed(2)} Td`, `${pdfString(str)} Tj`, 'ET')
+        const c = colorOp(parseColor(color), 'rg') || '0.000 0.000 0.000 rg'
+        ops.push(c, 'BT', `/F1 ${size} Tf`, `${tx.toFixed(2)} ${y.toFixed(2)} Td`, `${pdfString(str)} Tj`, 'ET')
       },
 
       rect(x, y, w, h, fill) {
@@ -204,7 +210,11 @@ export function pdf(): PDFBuilder {
     }))
   }
 
+  let built = false
   function build(): Uint8Array {
+    if (!pages.length) throw new Error('PDF must have at least one page')
+    if (built) throw new Error('build() can only be called once')
+    built = true
     const fontRef = addObject({ Type: '/Font', Subtype: '/Type1', BaseFont: '/Helvetica' })
     const pagesRef = addObject({ Type: '/Pages', Kids: pages, Count: pages.length })
 
@@ -317,10 +327,11 @@ export function markdown(md: string, opts: { width?: number; height?: number; ma
   let y = H - M, pg: Item[] = [], ys: number[] = []
   for (const item of items) {
     const needed = item.spaceBefore + item.size + item.spaceAfter
-    if (y - needed < M) { pages.push({ items: pg, ys }); pg = []; ys = []; y = H - M }
+    if (y - needed < M) { if (pg.length) pages.push({ items: pg, ys }); pg = []; ys = []; y = H - M }
     y -= item.spaceBefore; ys.push(y); pg.push(item); y -= item.size + item.spaceAfter
   }
   if (pg.length) pages.push({ items: pg, ys })
+  if (!pages.length) pages.push({ items: [], ys: [] })
 
   for (const { items: pi, ys: py } of pages) {
     doc.page(W, H, ctx => {

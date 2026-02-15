@@ -806,4 +806,43 @@ More text.`
     expect(str).toContain('Bullet')
     expect(str).toContain('Number')
   })
+
+  test('does not create empty first page when item is taller than page', () => {
+    // Use a very short page so even a single line overflows
+    const bytes = markdown('Hello world', { height: 80, margin: 35 })
+    const str = new TextDecoder().decode(bytes)
+    // Count actual pages — there should be no empty leading page
+    const pageMatches = str.match(/\/Type \/Page\b/g) || []
+    // The text should exist on a page
+    expect(str).toContain('(Hello world) Tj')
+    // Should be exactly 1 page, not 2 (no blank leader)
+    expect(pageMatches.length).toBe(1)
+  })
+})
+
+describe('build guards', () => {
+  test('throws when called with no pages', () => {
+    const doc = pdf()
+    expect(() => doc.build()).toThrow('PDF must have at least one page')
+  })
+
+  test('throws when called twice', () => {
+    const doc = pdf()
+    doc.page(() => {})
+    doc.build()
+    expect(() => doc.build()).toThrow('build() can only be called once')
+  })
+})
+
+describe('text with invalid color', () => {
+  test('defaults to black when color is invalid', () => {
+    const doc = pdf()
+    doc.page((ctx) => {
+      ctx.text('Hello', 50, 700, 12, { color: 'notacolor' })
+    })
+    const bytes = doc.build()
+    const str = new TextDecoder().decode(bytes)
+    expect(str).toContain('0.000 0.000 0.000 rg')
+    expect(str).toContain('(Hello) Tj')
+  })
 })
