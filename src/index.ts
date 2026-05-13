@@ -37,7 +37,7 @@ type PDFValue = null | boolean | number | string | PDFValue[] | Ref | { [key: st
 
 interface PDFObject {
   id: number
-  dict: Record<string, PDFValue>
+  dict: Record<string, PDFValue | undefined>
   stream: Uint8Array | null
 }
 
@@ -124,7 +124,7 @@ export function pdf(): PDFBuilder {
   const pages: Ref[] = []
   let nextId = 1
 
-  function addObject(dict: Record<string, PDFValue>, streamBytes: Uint8Array | null = null): Ref {
+  function addObject(dict: Record<string, PDFValue | undefined>, streamBytes: Uint8Array | null = null): Ref {
     const id = nextId++
     objects.push({ id, dict, stream: streamBytes })
     return new Ref(id)

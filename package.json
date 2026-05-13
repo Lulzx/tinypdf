@@ -1,6 +1,6 @@
 {
   "name": "tinypdf",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Minimal PDF creation library. <400 LOC, zero dependencies, makes real PDFs.",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,7 +21,7 @@
   "scripts": {
     "build": "bun build ./src/index.ts --outdir ./dist --target node && bun run build:cjs && bun run build:types",
     "build:cjs": "bun build ./src/index.ts --outfile ./dist/index.cjs --target node --format cjs",
-    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist src/index.ts",
+    "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist --project tsconfig.json",
     "test": "bun test",
     "prepublishOnly": "bun run build"
   },
