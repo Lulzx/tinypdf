@@ -14,6 +14,17 @@ npm install tinypdf
 
 > [View sample PDF](examples/invoice.pdf) — Generated with ~50 lines of code
 
+### Designed examples
+
+The `examples/` directory includes polished, asset-free layouts built entirely from text, rectangles, and lines:
+
+| Executive report | Event ticket | Certificate |
+|---|---|---|
+| [![Executive report](examples/executive-report.png)](examples/executive-report.ts) | [![Event ticket](examples/event-ticket.png)](examples/event-ticket.ts) | [![Certificate](examples/certificate.png)](examples/certificate.ts) |
+| Editorial dashboard with KPI cards and a bar chart | Compact landscape ticket with a bold poster-style panel | Formal landscape certificate with geometric ornamentation |
+
+Run any example with Bun, for example: `bun examples/executive-report.ts`.
+
 ---
 
 ## Why tinypdf?
