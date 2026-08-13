@@ -51,10 +51,10 @@ doc.page(W, H, p => {
   p.text('outpacing new', 432, 360, 17, { color: '#ffffff' })
   p.text('logo growth.', 432, 338, 17, { color: '#ffffff' })
   p.line(432, 314, 554, 314, '#44506a', 0.75)
-  p.text('Existing customers now', 432, 291, 9, { color: '#c2cad8' })
-  p.text('drive 41% of net-new ARR.', 432, 275, 9, { color: '#c2cad8' })
-  p.text('Prioritize adoption in', 432, 251, 9, { color: '#c2cad8' })
-  p.text('teams with 20+ seats.', 432, 235, 9, { color: '#c2cad8' })
+  p.text('Existing customers now', 432, 298, 9, { color: '#c2cad8' })
+  p.text('drive 41% of net-new ARR.', 432, 282, 9, { color: '#c2cad8' })
+  p.text('Prioritize adoption in', 432, 264, 9, { color: '#c2cad8' })
+  p.text('teams with 20+ seats.', 432, 248, 9, { color: '#c2cad8' })
 
   // Footer takeaways
   p.line(40, 198, 572, 198, line, 0.75)
