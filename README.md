@@ -33,7 +33,7 @@ Invoices, receipts, reports, shipping labels, tickets, certificates, contracts, 
 
 | Feature | Description |
 |---------|-------------|
-| **Text** | Helvetica, any size, hex colors, align left/center/right |
+| **Text** | Helvetica (WinAnsi), any size, hex colors, align left/center/right |
 | **Shapes** | Rectangles and lines |
 | **Images** | JPEG (photos, logos, signatures) |
 | **Links** | Clickable URLs with optional underline |
@@ -42,7 +42,7 @@ Invoices, receipts, reports, shipping labels, tickets, certificates, contracts, 
 
 ### Not included
 
-Custom fonts, PNG/GIF/SVG, vector graphics, forms, encryption, compression, HTML-to-PDF
+Unicode/custom fonts, PNG/GIF/SVG, vector graphics, forms, encryption, compression, HTML-to-PDF
 
 Need those? Use [jsPDF](https://github.com/parallax/jsPDF) or [pdf-lib](https://github.com/Hopding/pdf-lib).
 
@@ -124,7 +124,7 @@ writeFileSync('output.pdf', pdf)
 
 ### Stream large PDFs
 
-For documents too large to fit in memory, use `buildStream()` to emit a `ReadableStream<Uint8Array>` one object at a time.
+Use `buildStream()` to emit a `ReadableStream<Uint8Array>` incrementally. Page content and image inputs are retained until the stream reaches them, but stream bodies are emitted directly and the final PDF is not assembled into one additional full-size buffer.
 
 ```typescript
 import { pdf } from 'tinypdf'
