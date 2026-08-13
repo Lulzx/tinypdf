@@ -7,6 +7,16 @@ const WIDTHS: number[] = [
   556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584
 ]
 
+const WIN_ANSI = new Map<number, number>([
+  [0x20AC, 0x80], [0x201A, 0x82], [0x0192, 0x83], [0x201E, 0x84],
+  [0x2026, 0x85], [0x2020, 0x86], [0x2021, 0x87], [0x02C6, 0x88],
+  [0x2030, 0x89], [0x0160, 0x8A], [0x2039, 0x8B], [0x0152, 0x8C],
+  [0x017D, 0x8E], [0x2018, 0x91], [0x2019, 0x92], [0x201C, 0x93],
+  [0x201D, 0x94], [0x2022, 0x95], [0x2013, 0x96], [0x2014, 0x97],
+  [0x02DC, 0x98], [0x2122, 0x99], [0x0161, 0x9A], [0x203A, 0x9B],
+  [0x0153, 0x9C], [0x017E, 0x9E], [0x0178, 0x9F]
+])
+
 export interface TextOptions {
   align?: 'left' | 'center' | 'right'
   width?: number
@@ -33,7 +43,11 @@ export interface PDFBuilder {
   measureText: typeof measureText
 }
 
-type PDFValue = null | boolean | number | string | PDFValue[] | Ref | { [key: string]: PDFValue | undefined }
+type PDFValue = null | boolean | number | string | PDFLiteralString | PDFValue[] | Ref | { [key: string]: PDFValue | undefined }
+
+class PDFLiteralString {
+  constructor(readonly value: string) {}
+}
 
 interface PDFObject {
   id: number
@@ -42,12 +56,32 @@ interface PDFObject {
 }
 
 export function measureText(str: string, size: number): number {
+  assertPositive('Text size', size)
   let width = 0
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i)
-    width += (code >= 32 && code <= 126) ? WIDTHS[code - 32] : 556
+  for (const ch of str) {
+    const byte = winAnsiByte(ch)
+    width += (byte >= 32 && byte <= 126) ? WIDTHS[byte - 32] : 556
   }
   return (width * size) / 1000
+}
+
+function assertFinite(name: string, ...values: number[]): void {
+  if (values.some(value => !Number.isFinite(value)))
+    throw new TypeError(`${name} values must be finite numbers`)
+}
+
+function assertPositive(name: string, ...values: number[]): void {
+  assertFinite(name, ...values)
+  if (values.some(value => value <= 0))
+    throw new RangeError(`${name} values must be greater than zero`)
+}
+
+function winAnsiByte(ch: string): number {
+  const code = ch.codePointAt(0)!
+  const byte = code <= 0x7F || (code >= 0xA0 && code <= 0xFF) ? code : WIN_ANSI.get(code)
+  if (byte === undefined)
+    throw new TypeError(`Unsupported character U+${code.toString(16).toUpperCase().padStart(4, '0')}; Helvetica text is limited to WinAnsi`)
+  return byte
 }
 
 function parseColor(hex: string | undefined): number[] | null {
@@ -70,7 +104,8 @@ function parseJpeg(bytes: Uint8Array): { width: number; height: number; colorSpa
     if (bytes[i] !== 0xFF) { i++; continue }
     const marker = bytes[i + 1]
     if (marker === 0xDA) break // SOS — compressed data follows, stop scanning
-    if (marker === 0xC0 || marker === 0xC2) {
+    const isSof = marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)
+    if (isSof) {
       if (i + 9 >= bytes.length) break
       const height = (bytes[i + 5] << 8) | bytes[i + 6]
       const width = (bytes[i + 7] << 8) | bytes[i + 8]
@@ -86,23 +121,24 @@ function parseJpeg(bytes: Uint8Array): { width: number; height: number; colorSpa
 }
 
 function pdfString(str: string): string {
-  return '(' + str
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)')
-    .replace(/\r/g, '\\r')
-    .replace(/\n/g, '\\n') + ')'
+  let result = '('
+  for (const ch of str) {
+    const byte = winAnsiByte(ch)
+    if (byte === 0x5C || byte === 0x28 || byte === 0x29) result += '\\' + String.fromCharCode(byte)
+    else if (byte === 0x0D) result += '\\r'
+    else if (byte === 0x0A) result += '\\n'
+    else if (byte < 0x20 || byte >= 0x7F) result += `\\${byte.toString(8).padStart(3, '0')}`
+    else result += String.fromCharCode(byte)
+  }
+  return result + ')'
 }
 
 function serialize(val: PDFValue): string {
   if (val === null || val === undefined) return 'null'
   if (typeof val === 'boolean') return val ? 'true' : 'false'
   if (typeof val === 'number') return Number.isInteger(val) ? String(val) : val.toFixed(4).replace(/\.?0+$/, '')
-  if (typeof val === 'string') {
-    if (val.startsWith('/')) return val
-    if (val.startsWith('(')) return val
-    return pdfString(val)
-  }
+  if (typeof val === 'string') return val
+  if (val instanceof PDFLiteralString) return pdfString(val.value)
   if (Array.isArray(val)) return '[' + val.map(serialize).join(' ') + ']'
   if (val instanceof Ref) return `${val.id} 0 R`
   if (typeof val === 'object') {
@@ -134,6 +170,8 @@ export function pdf(): PDFBuilder {
     let width: number, height: number, fn: (ctx: PageContext) => void
     if (typeof widthOrFn === 'function') { width = 612; height = 792; fn = widthOrFn }
     else { width = widthOrFn; height = heightOrUndefined!; fn = fnOrUndefined! }
+    assertPositive('Page dimensions', width, height)
+    if (typeof fn !== 'function') throw new TypeError('page() requires a callback')
 
     const ops: string[] = []
     const images: { name: string; ref: Ref }[] = []
@@ -142,9 +180,12 @@ export function pdf(): PDFBuilder {
 
     const ctx: PageContext = {
       text(str, x, y, size, opts: TextOptions = {}) {
+        assertFinite('Text coordinates', x, y)
+        assertPositive('Text size', size)
         const { align = 'left', width: boxWidth, color = '#000000' } = opts
         let tx = x
         if (align !== 'left' && boxWidth !== undefined) {
+          assertFinite('Text width', boxWidth)
           const tw = measureText(str, size)
           if (align === 'center') tx = x + (boxWidth - tw) / 2
           if (align === 'right') tx = x + boxWidth - tw
@@ -154,6 +195,8 @@ export function pdf(): PDFBuilder {
       },
 
       rect(x, y, w, h, fill) {
+        assertFinite('Rectangle coordinates', x, y)
+        assertPositive('Rectangle dimensions', w, h)
         const c = colorOp(parseColor(fill), 'rg')
         if (c) {
           ops.push(c, `${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re`, 'f')
@@ -161,6 +204,8 @@ export function pdf(): PDFBuilder {
       },
 
       line(x1, y1, x2, y2, stroke, lineWidth = 1) {
+        assertFinite('Line coordinates', x1, y1, x2, y2)
+        assertPositive('Line width', lineWidth)
         const c = colorOp(parseColor(stroke), 'RG')
         if (c) {
           ops.push(`${lineWidth.toFixed(2)} w`, c, `${x1.toFixed(2)} ${y1.toFixed(2)} m`, `${x2.toFixed(2)} ${y2.toFixed(2)} l`, 'S')
@@ -168,6 +213,8 @@ export function pdf(): PDFBuilder {
       },
 
       image(jpegBytes, x, y, w, h) {
+        assertFinite('Image coordinates', x, y)
+        assertPositive('Image dimensions', w, h)
         const { width: imgW, height: imgH, colorSpace } = parseJpeg(jpegBytes)
         const imgName = `/Im${imageCount++}`
         const imgRef = addObject({
@@ -179,6 +226,8 @@ export function pdf(): PDFBuilder {
       },
 
       link(url, x, y, w, h, opts: LinkOptions = {}) {
+        assertFinite('Link coordinates', x, y)
+        assertPositive('Link dimensions', w, h)
         links.push({ url, rect: [x, y, x + w, y + h] })
         if (opts.underline) {
           const c = colorOp(parseColor(opts.underline), 'RG')
@@ -200,7 +249,7 @@ export function pdf(): PDFBuilder {
 
     const annots: Ref[] = links.map(lnk => addObject({
       Type: '/Annot', Subtype: '/Link', Rect: lnk.rect, Border: [0, 0, 0],
-      A: { Type: '/Action', S: '/URI', URI: lnk.url }
+      A: { Type: '/Action', S: '/URI', URI: new PDFLiteralString(lnk.url) }
     }))
 
     pages.push(addObject({
@@ -217,7 +266,7 @@ export function pdf(): PDFBuilder {
     if (!pages.length) throw new Error('PDF must have at least one page')
     if (built) throw new Error('build() can only be called once')
     built = true
-    const fontRef = addObject({ Type: '/Font', Subtype: '/Type1', BaseFont: '/Helvetica' })
+    const fontRef = addObject({ Type: '/Font', Subtype: '/Type1', BaseFont: '/Helvetica', Encoding: '/WinAnsiEncoding' })
     const pagesRef = addObject({ Type: '/Pages', Kids: pages, Count: pages.length })
     for (const obj of objects) {
       if (obj.dict.Type === '/Page') {
@@ -241,9 +290,9 @@ export function pdf(): PDFBuilder {
       const head = `${obj.id} 0 obj\n${serialize(obj.dict)}\n`
       if (obj.stream) {
         const a = enc.encode(head + 'stream\n'), b = obj.stream, c = enc.encode('\nendstream\nendobj\n')
-        const chunk = new Uint8Array(a.length + b.length + c.length)
-        chunk.set(a, 0); chunk.set(b, a.length); chunk.set(c, a.length + b.length)
-        byteOffset += chunk.length; obj.stream = null as unknown as Uint8Array; yield chunk
+        byteOffset += a.length; yield a
+        byteOffset += b.length; yield b
+        byteOffset += c.length; obj.stream = null; yield c
       } else { const bytes = enc.encode(head + 'endobj\n'); byteOffset += bytes.length; yield bytes }
     }
 
@@ -282,6 +331,10 @@ export function pdf(): PDFBuilder {
 
 export function markdown(md: string, opts: { width?: number; height?: number; margin?: number } = {}): Uint8Array {
   const W = opts.width ?? 612, H = opts.height ?? 792, M = opts.margin ?? 72
+  assertPositive('Page dimensions', W, H)
+  assertFinite('Margin', M)
+  if (M < 0 || W - M * 2 <= 0 || H - M * 2 <= 0)
+    throw new RangeError('Margin must be non-negative and leave usable page space')
   const doc = pdf(), textW = W - M * 2, bodySize = 11
   type Item = { text: string; size: number; indent: number; spaceBefore: number; spaceAfter: number; rule?: boolean; color?: string }
   const items: Item[] = []

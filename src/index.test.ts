@@ -535,11 +535,15 @@ describe('measureText', () => {
     expect(withSpace).toBeGreaterThan(withoutSpace)
   })
 
-  test('uses fallback width for non-ASCII', () => {
+  test('uses fallback width for WinAnsi non-ASCII', () => {
     const ascii = measureText('a', 12)
-    const nonAscii = measureText('中', 12)
-    // Non-ASCII uses fallback width of 556 units
+    const nonAscii = measureText('é', 12)
+    // Extended WinAnsi characters use the fallback width of 556 units
     expect(nonAscii).toBeCloseTo(556 * 12 / 1000, 5)
+  })
+
+  test('rejects characters unavailable in WinAnsi', () => {
+    expect(() => measureText('中', 12)).toThrow('Unsupported character U+4E2D')
   })
 
   test('returns expected width for known string', () => {
@@ -581,6 +585,7 @@ describe('PDF structure', () => {
     const bytes = doc.build()
     const str = new TextDecoder().decode(bytes)
     expect(str).toContain('/BaseFont /Helvetica')
+    expect(str).toContain('/Encoding /WinAnsiEncoding')
   })
 
   test('contains xref table', () => {
@@ -834,6 +839,29 @@ describe('build guards', () => {
   })
 })
 
+describe('numeric validation', () => {
+  test('rejects invalid page dimensions', () => {
+    const doc = pdf()
+    expect(() => doc.page(0, 792, () => {})).toThrow('greater than zero')
+    expect(() => doc.page(Number.NaN, 792, () => {})).toThrow('finite numbers')
+  })
+
+  test('rejects non-finite drawing values', () => {
+    const doc = pdf()
+    expect(() => doc.page(ctx => ctx.text('x', Number.NaN, 10, 12))).toThrow('finite numbers')
+  })
+
+  test('rejects non-positive dimensions and widths', () => {
+    const doc = pdf()
+    expect(() => doc.page(ctx => ctx.rect(0, 0, -1, 10, '#000'))).toThrow('greater than zero')
+    expect(() => doc.page(ctx => ctx.line(0, 0, 10, 10, '#000', 0))).toThrow('greater than zero')
+  })
+
+  test('rejects markdown margins that leave no usable page', () => {
+    expect(() => markdown('text', { width: 100, height: 100, margin: 50 })).toThrow('usable page space')
+  })
+})
+
 describe('text with invalid color', () => {
   test('defaults to black when color is invalid', () => {
     const doc = pdf()
@@ -948,6 +976,19 @@ describe('buildStream', () => {
     expect(chunks.length).toBeGreaterThan(1)
   })
 
+  test('emits stream bodies without copying them into wrapper chunks', async () => {
+    const doc = pdf()
+    doc.page(ctx => ctx.text('Test', 50, 700, 12))
+    const reader = doc.buildStream().getReader()
+    const chunks: Uint8Array[] = []
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+    }
+    expect(chunks.some(chunk => new TextDecoder().decode(chunk) === '0.000 0.000 0.000 rg\nBT\n/F1 12 Tf\n50.00 700.00 Td\n(Test) Tj\nET')).toBe(true)
+  })
+
   test('build() throws after buildStream()', () => {
     const doc = pdf()
     doc.page(() => {})
@@ -975,6 +1016,19 @@ describe('pdfString escaping', () => {
     doc.page(ctx => ctx.text('line\ntwo', 50, 700, 12))
     const str = new TextDecoder().decode(doc.build())
     expect(str).toContain('(line\\ntwo) Tj')
+  })
+
+  test('encodes WinAnsi text without UTF-8 bytes', () => {
+    const doc = pdf()
+    doc.page(ctx => ctx.text('café — €', 50, 700, 12))
+    const str = new TextDecoder().decode(doc.build())
+    expect(str).toContain('(caf\\351 \\227 \\200) Tj')
+    expect(str).not.toContain('café')
+  })
+
+  test('rejects characters unavailable in Helvetica WinAnsi', () => {
+    const doc = pdf()
+    expect(() => doc.page(ctx => ctx.text('中', 50, 700, 12))).toThrow('Unsupported character U+4E2D')
   })
 })
 
@@ -1054,6 +1108,15 @@ describe('link edge cases', () => {
     const str = new TextDecoder().decode(doc.build())
     expect(str).toContain('/URI (https://example.com/path?a=1&b=\\(2\\))')
   })
+
+  test('URLs beginning with PDF syntax characters remain literal strings', () => {
+    for (const url of ['/docs', '(oops']) {
+      const doc = pdf()
+      doc.page(ctx => ctx.link(url, 50, 700, 100, 20))
+      const str = new TextDecoder().decode(doc.build())
+      expect(str).toContain(`/URI (${url.replace('(', '\\(')})`)
+    }
+  })
 })
 
 describe('image edge cases', () => {
@@ -1083,6 +1146,18 @@ describe('image edge cases', () => {
     expect(str).toContain('/Width 32')
     expect(str).toContain('/Height 16')
     expect(str).toContain('/ColorSpace /DeviceRGB')
+  })
+
+  test('other valid JPEG SOF markers are parsed', () => {
+    for (const marker of [0xC1, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF]) {
+      const jpeg = new Uint8Array([
+        0xFF, 0xD8, 0xFF, marker, 0x00, 0x0B, 0x08,
+        0x00, 0x10, 0x00, 0x20, 0x03, 0x01, 0x22, 0x00
+      ])
+      const doc = pdf()
+      doc.page(ctx => ctx.image(jpeg, 50, 600, 100, 50))
+      expect(new TextDecoder().decode(doc.build())).toContain('/Width 32')
+    }
   })
 
   test('JPEG with SOS before SOF throws', () => {
