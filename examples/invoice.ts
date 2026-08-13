@@ -1,75 +1,85 @@
-import { pdf, measureText } from '../src/index'
-import { writeFileSync } from 'fs'
+import { pdf } from '../src/index'
 
-// Create a sample invoice PDF
 const doc = pdf()
+const W = 612, H = 792
 
-doc.page(612, 792, (p) => {
-  const margin = 40
-  const pw = 612 - margin * 2  // page width minus margins = 532
+doc.page(W, H, p => {
+  const ink = '#182232', muted = '#6f7887', blue = '#315ee7'
+  const mint = '#52d3ac', pale = '#f3f6fa', line = '#dce2eb'
+  const margin = 44, contentW = W - margin * 2
 
-  // Header
-  p.rect(margin, 716, pw, 36, '#2563eb')
-  p.text('INVOICE', margin + 15, 726, 24, { color: '#ffffff' })
-  p.text('#INV-2025-001', margin + pw - 100, 728, 12, { color: '#ffffff' })
+  p.rect(0, 0, W, H, '#ffffff')
 
-  // Company info
-  p.text('Acme Corporation', margin, 670, 16, { color: '#000000' })
-  p.text('123 Business Street', margin, 652, 11, { color: '#666666' })
-  p.text('New York, NY 10001', margin, 638, 11, { color: '#666666' })
+  // Masthead
+  p.rect(0, 696, W, 96, ink)
+  p.rect(margin, 744, 24, 4, mint)
+  p.text('NORTHSTAR', margin + 34, 736, 11, { color: '#ffffff' })
+  p.text('INVOICE', 352, 727, 27, { color: '#ffffff', align: 'right', width: 216 })
+  p.text('Creative technology studio', margin, 711, 9, { color: '#aeb8c8' })
 
-  // Bill to
-  p.text('Bill To:', margin + 300, 670, 12, { color: '#666666' })
-  p.text('John Smith', margin + 300, 652, 14, { color: '#000000' })
-  p.text('456 Customer Ave', margin + 300, 636, 11, { color: '#666666' })
-  p.text('Los Angeles, CA 90001', margin + 300, 622, 11, { color: '#666666' })
+  // Identity and invoice metadata
+  p.text('BILLED TO', margin, 652, 8, { color: blue })
+  p.text('Maya Bennett', margin, 624, 17, { color: ink })
+  p.text('Fieldwork Studio', margin, 604, 10, { color: muted })
+  p.text('240 Mercer Street', margin, 588, 10, { color: muted })
+  p.text('New York, NY 10012', margin, 572, 10, { color: muted })
 
-  // Table header
-  p.rect(margin, 560, pw, 25, '#f3f4f6')
-  p.text('Description', margin + 10, 568, 11, { color: '#000000' })
-  p.text('Qty', margin + 270, 568, 11, { color: '#000000' })
-  p.text('Price', margin + 340, 568, 11, { color: '#000000' })
-  p.text('Total', margin + 440, 568, 11, { color: '#000000' })
-
-  // Table rows
-  const items = [
-    ['Website Development', '1', '$5,000.00', '$5,000.00'],
-    ['Hosting (Annual)', '1', '$200.00', '$200.00'],
-    ['Maintenance Package', '12', '$150.00', '$1,800.00'],
+  p.rect(354, 560, 214, 96, pale)
+  const meta = [
+    ['INVOICE NO.', 'NS-2048'],
+    ['ISSUED', '18 SEP 2026'],
+    ['DUE', '18 OCT 2026'],
   ]
+  meta.forEach(([label, value], i) => {
+    const y = 632 - i * 27
+    p.text(label, 370, y, 7, { color: muted })
+    p.text(value, 450, y, 9, { color: ink, align: 'right', width: 100 })
+  })
 
-  let y = 535
-  for (const [desc, qty, price, total] of items) {
-    p.text(desc, margin + 10, y, 11)
-    p.text(qty, margin + 270, y, 11)
-    p.text(price, margin + 340, y, 11)
-    p.text(total, margin + 440, y, 11)
-    p.line(margin, y - 15, margin + pw, y - 15, '#e5e7eb', 0.5)
-    y -= 30
-  }
+  // Line items
+  p.text('PROJECT / Q3 PRODUCT LAUNCH', margin, 520, 8, { color: blue })
+  p.rect(margin, 478, contentW, 28, ink)
+  p.text('DESCRIPTION', margin + 14, 487, 8, { color: '#ffffff' })
+  p.text('QTY', 350, 487, 8, { color: '#ffffff' })
+  p.text('RATE', 405, 487, 8, { color: '#ffffff' })
+  p.text('AMOUNT', 488, 487, 8, { color: '#ffffff' })
 
-  // Total section
-  p.line(margin, y, margin + pw, y, '#000000', 1)
-  p.text('Subtotal:', margin + 340, y - 25, 11)
-  p.text('$7,000.00', margin + 440, y - 25, 11)
-  p.text('Tax (8%):', margin + 340, y - 45, 11)
-  p.text('$560.00', margin + 440, y - 45, 11)
-  p.rect(margin + 330, y - 75, 202, 25, '#2563eb')
-  p.text('Total Due:', margin + 340, y - 63, 12, { color: '#ffffff' })
-  p.text('$7,560.00', margin + 440, y - 63, 12, { color: '#ffffff' })
+  const items = [
+    ['Product strategy sprint', '1', '$2,400', '$2,400'],
+    ['Interface design system', '1', '$3,850', '$3,850'],
+    ['Launch motion toolkit', '1', '$1,200', '$1,200'],
+    ['Design QA and handoff', '8h', '$150', '$1,200'],
+  ]
+  items.forEach(([description, qty, rate, amount], i) => {
+    const y = 444 - i * 45
+    p.text(description, margin + 14, y, 10, { color: ink })
+    p.text(qty, 350, y, 10, { color: muted })
+    p.text(rate, 405, y, 10, { color: muted })
+    p.text(amount, 478, y, 10, { color: ink, align: 'right', width: 76 })
+    p.line(margin, y - 17, margin + contentW, y - 17, line, 0.6)
+  })
+
+  // Notes and totals
+  p.text('PAYMENT DETAILS', margin, 244, 8, { color: blue })
+  p.text('Bank transfer / Northstar Studio LLC', margin, 219, 9, { color: ink })
+  p.text('Routing 021000021  /  Account 8841 0920', margin, 202, 9, { color: muted })
+  p.text('Please include invoice NS-2048 in the transfer note.', margin, 177, 8, { color: muted })
+
+  p.rect(354, 148, 214, 112, pale)
+  p.text('SUBTOTAL', 370, 234, 8, { color: muted })
+  p.text('$8,650.00', 458, 234, 9, { color: ink, align: 'right', width: 94 })
+  p.text('TAX', 370, 210, 8, { color: muted })
+  p.text('$692.00', 458, 210, 9, { color: ink, align: 'right', width: 94 })
+  p.rect(354, 148, 214, 42, blue)
+  p.text('BALANCE DUE', 370, 164, 9, { color: '#ffffff' })
+  p.text('$9,342.00', 450, 160, 16, { color: '#ffffff', align: 'right', width: 102 })
 
   // Footer
-  p.text('Thank you for your business!', margin, 80, 12, { align: 'center', width: pw, color: '#666666' })
-  p.text('Payment due within 30 days', margin, 62, 10, { align: 'center', width: pw, color: '#999999' })
+  p.line(margin, 104, margin + contentW, 104, line, 0.75)
+  p.text('Thank you for building with us.', margin, 74, 11, { color: ink })
+  p.text('hello@northstar.design  /  northstar.design', margin, 55, 8, { color: muted })
+  p.text('01 / 01', 508, 55, 8, { color: '#98a2b1', align: 'right', width: 60 })
 })
 
-const bytes = doc.build()
-writeFileSync('examples/invoice.pdf', bytes)
-
-console.log('Created invoice.pdf')
-console.log(`File size: ${bytes.length} bytes`)
-
-// Test measureText
-console.log(`\nmeasureText test:`)
-console.log(`"Hello" at 12pt = ${measureText('Hello', 12).toFixed(2)}pt`)
-console.log(`"Hello World" at 24pt = ${measureText('Hello World', 24).toFixed(2)}pt`)
+await Bun.write(new URL('./invoice.pdf', import.meta.url).pathname, doc.build())
+console.log('Created examples/invoice.pdf')

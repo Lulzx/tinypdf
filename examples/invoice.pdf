@@ -2,235 +2,342 @@
 %ÿÿÿÿ
 1 0 obj
 <<
-/Length 2739
+/Length 4124
 >>
 stream
-0.145 0.388 0.922 rg
-40.00 716.00 532.00 36.00 re
+1.000 1.000 1.000 rg
+0.00 0.00 612.00 792.00 re
+f
+0.094 0.133 0.196 rg
+0.00 696.00 612.00 96.00 re
+f
+0.322 0.827 0.675 rg
+44.00 744.00 24.00 4.00 re
 f
 1.000 1.000 1.000 rg
 BT
-/F1 24 Tf
-55.00 726.00 Td
+/F1 11 Tf
+78.00 736.00 Td
+(NORTHSTAR) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F1 27 Tf
+456.98 727.00 Td
 (INVOICE) Tj
 ET
-1.000 1.000 1.000 rg
+0.682 0.722 0.784 rg
 BT
-/F1 12 Tf
-472.00 728.00 Td
-(#INV-2025-001) Tj
+/F1 9 Tf
+44.00 711.00 Td
+(Creative technology studio) Tj
 ET
-0.000 0.000 0.000 rg
+0.192 0.369 0.906 rg
 BT
-/F1 16 Tf
-40.00 670.00 Td
-(Acme Corporation) Tj
+/F1 8 Tf
+44.00 652.00 Td
+(BILLED TO) Tj
 ET
-0.400 0.400 0.400 rg
+0.094 0.133 0.196 rg
 BT
-/F1 11 Tf
-40.00 652.00 Td
-(123 Business Street) Tj
+/F1 17 Tf
+44.00 624.00 Td
+(Maya Bennett) Tj
 ET
-0.400 0.400 0.400 rg
-BT
-/F1 11 Tf
-40.00 638.00 Td
-(New York, NY 10001) Tj
-ET
-0.400 0.400 0.400 rg
-BT
-/F1 12 Tf
-340.00 670.00 Td
-(Bill To:) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 14 Tf
-340.00 652.00 Td
-(John Smith) Tj
-ET
-0.400 0.400 0.400 rg
-BT
-/F1 11 Tf
-340.00 636.00 Td
-(456 Customer Ave) Tj
-ET
-0.400 0.400 0.400 rg
-BT
-/F1 11 Tf
-340.00 622.00 Td
-(Los Angeles, CA 90001) Tj
-ET
-0.953 0.957 0.965 rg
-40.00 560.00 532.00 25.00 re
-f
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-50.00 568.00 Td
-(Description) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-310.00 568.00 Td
-(Qty) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 568.00 Td
-(Price) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 568.00 Td
-(Total) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-50.00 535.00 Td
-(Website Development) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-310.00 535.00 Td
-(1) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 535.00 Td
-($5,000.00) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 535.00 Td
-($5,000.00) Tj
-ET
-0.50 w
-0.898 0.906 0.922 RG
-40.00 520.00 m
-572.00 520.00 l
-S
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-50.00 505.00 Td
-(Hosting \(Annual\)) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-310.00 505.00 Td
-(1) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 505.00 Td
-($200.00) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 505.00 Td
-($200.00) Tj
-ET
-0.50 w
-0.898 0.906 0.922 RG
-40.00 490.00 m
-572.00 490.00 l
-S
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-50.00 475.00 Td
-(Maintenance Package) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-310.00 475.00 Td
-(12) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 475.00 Td
-($150.00) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 475.00 Td
-($1,800.00) Tj
-ET
-0.50 w
-0.898 0.906 0.922 RG
-40.00 460.00 m
-572.00 460.00 l
-S
-1.00 w
-0.000 0.000 0.000 RG
-40.00 445.00 m
-572.00 445.00 l
-S
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 420.00 Td
-(Subtotal:) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 420.00 Td
-($7,000.00) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-380.00 400.00 Td
-(Tax \(8%\):) Tj
-ET
-0.000 0.000 0.000 rg
-BT
-/F1 11 Tf
-480.00 400.00 Td
-($560.00) Tj
-ET
-0.145 0.388 0.922 rg
-370.00 370.00 202.00 25.00 re
-f
-1.000 1.000 1.000 rg
-BT
-/F1 12 Tf
-380.00 382.00 Td
-(Total Due:) Tj
-ET
-1.000 1.000 1.000 rg
-BT
-/F1 12 Tf
-480.00 382.00 Td
-($7,560.00) Tj
-ET
-0.400 0.400 0.400 rg
-BT
-/F1 12 Tf
-228.97 80.00 Td
-(Thank you for your business!) Tj
-ET
-0.600 0.600 0.600 rg
+0.435 0.471 0.529 rg
 BT
 /F1 10 Tf
-243.47 62.00 Td
-(Payment due within 30 days) Tj
+44.00 604.00 Td
+(Fieldwork Studio) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+44.00 588.00 Td
+(240 Mercer Street) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+44.00 572.00 Td
+(New York, NY 10012) Tj
+ET
+0.953 0.965 0.980 rg
+354.00 560.00 214.00 96.00 re
+f
+0.435 0.471 0.529 rg
+BT
+/F1 7 Tf
+370.00 632.00 Td
+(INVOICE NO.) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+514.49 632.00 Td
+(NS-2048) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 7 Tf
+370.00 605.00 Td
+(ISSUED) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+496.96 605.00 Td
+(18 SEP 2026) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 7 Tf
+370.00 578.00 Td
+(DUE) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+495.97 578.00 Td
+(18 OCT 2026) Tj
+ET
+0.192 0.369 0.906 rg
+BT
+/F1 8 Tf
+44.00 520.00 Td
+(PROJECT / Q3 PRODUCT LAUNCH) Tj
+ET
+0.094 0.133 0.196 rg
+44.00 478.00 524.00 28.00 re
+f
+1.000 1.000 1.000 rg
+BT
+/F1 8 Tf
+58.00 487.00 Td
+(DESCRIPTION) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F1 8 Tf
+350.00 487.00 Td
+(QTY) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F1 8 Tf
+405.00 487.00 Td
+(RATE) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F1 8 Tf
+488.00 487.00 Td
+(AMOUNT) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+58.00 444.00 Td
+(Product strategy sprint) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+350.00 444.00 Td
+(1) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+405.00 444.00 Td
+($2,400) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+523.42 444.00 Td
+($2,400) Tj
+ET
+0.60 w
+0.863 0.886 0.922 RG
+44.00 427.00 m
+568.00 427.00 l
+S
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+58.00 399.00 Td
+(Interface design system) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+350.00 399.00 Td
+(1) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+405.00 399.00 Td
+($3,850) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+523.42 399.00 Td
+($3,850) Tj
+ET
+0.60 w
+0.863 0.886 0.922 RG
+44.00 382.00 m
+568.00 382.00 l
+S
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+58.00 354.00 Td
+(Launch motion toolkit) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+350.00 354.00 Td
+(1) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+405.00 354.00 Td
+($1,200) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+523.42 354.00 Td
+($1,200) Tj
+ET
+0.60 w
+0.863 0.886 0.922 RG
+44.00 337.00 m
+568.00 337.00 l
+S
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+58.00 309.00 Td
+(Design QA and handoff) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+350.00 309.00 Td
+(8h) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 10 Tf
+405.00 309.00 Td
+($150) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 10 Tf
+523.42 309.00 Td
+($1,200) Tj
+ET
+0.60 w
+0.863 0.886 0.922 RG
+44.00 292.00 m
+568.00 292.00 l
+S
+0.192 0.369 0.906 rg
+BT
+/F1 8 Tf
+44.00 244.00 Td
+(PAYMENT DETAILS) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+44.00 219.00 Td
+(Bank transfer / Northstar Studio LLC) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 9 Tf
+44.00 202.00 Td
+(Routing 021000021  /  Account 8841 0920) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 8 Tf
+44.00 177.00 Td
+(Please include invoice NS-2048 in the transfer note.) Tj
+ET
+0.953 0.965 0.980 rg
+354.00 148.00 214.00 112.00 re
+f
+0.435 0.471 0.529 rg
+BT
+/F1 8 Tf
+370.00 234.00 Td
+(SUBTOTAL) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+511.97 234.00 Td
+($8,650.00) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 8 Tf
+370.00 210.00 Td
+(TAX) Tj
+ET
+0.094 0.133 0.196 rg
+BT
+/F1 9 Tf
+519.47 210.00 Td
+($692.00) Tj
+ET
+0.192 0.369 0.906 rg
+354.00 148.00 214.00 42.00 re
+f
+1.000 1.000 1.000 rg
+BT
+/F1 9 Tf
+370.00 164.00 Td
+(BALANCE DUE) Tj
+ET
+1.000 1.000 1.000 rg
+BT
+/F1 16 Tf
+480.83 160.00 Td
+($9,342.00) Tj
+ET
+0.75 w
+0.863 0.886 0.922 RG
+44.00 104.00 m
+568.00 104.00 l
+S
+0.094 0.133 0.196 rg
+BT
+/F1 11 Tf
+44.00 74.00 Td
+(Thank you for building with us.) Tj
+ET
+0.435 0.471 0.529 rg
+BT
+/F1 8 Tf
+44.00 55.00 Td
+(hello@northstar.design  /  northstar.design) Tj
+ET
+0.596 0.635 0.694 rg
+BT
+/F1 8 Tf
+543.54 55.00 Td
+(01 / 01) Tj
 ET
 endstream
 endobj
@@ -252,6 +359,7 @@ endobj
 /Type /Font
 /Subtype /Type1
 /BaseFont /Helvetica
+/Encoding /WinAnsiEncoding
 >>
 endobj
 4 0 obj
@@ -271,15 +379,15 @@ xref
 0 6
 0000000000 65535 f 
 0000000019 00000 n 
-0000002810 00000 n 
-0000002936 00000 n 
-0000003006 00000 n 
-0000003063 00000 n 
+0000004195 00000 n 
+0000004321 00000 n 
+0000004418 00000 n 
+0000004475 00000 n 
 trailer
 <<
 /Size 6
 /Root 5 0 R
 >>
 startxref
-3112
+4524
 %%EOF
