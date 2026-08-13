@@ -45,7 +45,7 @@ doc.page(W, H, p => {
   })
 
   // Narrative panel
-  p.rect(414, 240, 158, 198, ink)
+  p.rect(414, 220, 158, 218, ink)
   p.text('SIGNAL', 432, 412, 8, { color: mint })
   p.text('Expansion is', 432, 382, 17, { color: '#ffffff' })
   p.text('outpacing new', 432, 360, 17, { color: '#ffffff' })
@@ -53,8 +53,8 @@ doc.page(W, H, p => {
   p.line(432, 314, 554, 314, '#44506a', 0.75)
   p.text('Existing customers now', 432, 291, 9, { color: '#c2cad8' })
   p.text('drive 41% of net-new ARR.', 432, 275, 9, { color: '#c2cad8' })
-  p.text('Prioritize adoption in', 432, 255, 9, { color: '#c2cad8' })
-  p.text('teams with 20+ seats.', 432, 241, 9, { color: '#c2cad8' })
+  p.text('Prioritize adoption in', 432, 251, 9, { color: '#c2cad8' })
+  p.text('teams with 20+ seats.', 432, 235, 9, { color: '#c2cad8' })
 
   // Footer takeaways
   p.line(40, 198, 572, 198, line, 0.75)
